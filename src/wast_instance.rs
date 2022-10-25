@@ -1,7 +1,7 @@
 use wasmer::{imports, Instance, Module, Store, Value};
 use wast;
 
-crate::entry_point!("wast_instance", go);
+crate::entry_point!("wast_instance", go, _EP_GO1);
 
 pub fn mk(x: &str) -> Instance {
     let buf = wast::parser::ParseBuffer::new(x).unwrap();
@@ -77,4 +77,72 @@ fn go() {
 
     assert_eq!(result.unwrap()[0], Value::F64(34.8));
     assert_eq!(main(wast)[0], result1.unwrap()[0]);
+}
+
+// Testing https://zulip.yatima.io/#narrow/stream/20-meta/topic/WAST.20pair.20prog/near/28079
+
+#[test]
+#[should_panic(
+    expected = r#"called `Result::unwrap()` on an `Err` value: Validate("type mismatch: expected v128, found f32 (at offset 28)")"#
+)]
+fn q11() {
+    main(
+        r#"(module
+            (func $f (param $y f32) (param $p v128) (result f32)
+                local.get $y
+                f32x4.extract_lane 1
+                local.get $p
+            )
+        )
+        "#,
+    );
+}
+
+#[test]
+#[should_panic(
+    expected = r#"called `Result::unwrap()` on an `Err` value: Validate("type mismatch: expected v128, found f32 (at offset 28)")"#
+)]
+fn q12() {
+    main(
+        r#"(module
+            (func $f (param $y f32) (param $p v128) (result f32)
+                local.get $y
+                f32x4.extract_lane 1 (local.get $p)
+            )
+        )
+        "#,
+    );
+}
+
+#[test]
+#[should_panic(
+    expected = r#"called `Result::unwrap()` on an `Err` value: Validate("type mismatch: values remaining on stack at end of block (at offset 33)")"#
+)]
+fn q13() {
+    main(
+        r#"(module
+            (func $f (param $y f32) (param $p v128) (result f32)
+                local.get $y
+                (f32x4.extract_lane 1 (local.get $p))
+            )
+        )
+        "#,
+    );
+}
+
+#[test]
+fn q14() {
+    main(
+        r#"(module
+            (func $f (param $y f32) (param $p v128) (result f32)
+                local.get $y
+                (f32x4.extract_lane 1 (local.get $p))
+                f32.add
+            )
+            (func (export "main") (result f32)
+                (call $f (f32.const 0.1) (v128.const f32x4 41.9 0.0 0.0 0.0))
+            )
+        )
+        "#,
+    );
 }
