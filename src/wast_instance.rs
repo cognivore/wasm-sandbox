@@ -55,7 +55,7 @@ fn main() {
         Value::I32(5),
     ]);
 
-    assert_eq!(result.unwrap()[0], Value::F64(0.0));
+    assert_eq!(result.unwrap()[0], Value::F64(34.8));
 
     ()
 }
