@@ -1,135 +1,77 @@
-use std::panic;
+#![feature(let_else)]
 
-use wasmer::{imports, Instance, Module, Store, Value};
+mod just_wat;
+mod wast_instance;
 
-fn main() -> anyhow::Result<()> {
-    // let module_wat = r#"
-    // (module
-    //   (type $t0 (func (param i32) (result i32)))
-    //   (func $add_one (export "add_one") (type $t0) (param $p0 i32) (result i32)
-    //     local.get $p0
-    //     i32.const 1
-    //     i32.add))
-    // "#;
+extern crate core;
 
-    let module_wat = r#"
-    (module
+crate::entry_point!("hello", hello);
+fn hello() {
+    println!("hello");
+}
 
-      (func $f (export "f") (param $x f32) (result v128)
-        (local $a f32) (local $b f32) (local $c f32) (local $d f32) (local $y v128)
+#[linkme::distributed_slice]
+static ENTRY_POINTS: [(&'static str, fn())] = [..];
 
-        f32.const 0
-        f32x4.splat
-        local.set $y
-
-        local.get $x
-        f32.neg
-        local.set $a
-
-        local.get $x
-        f32.nearest
-        local.set $b
-
-        local.get $x
-        f32.trunc
-        local.set $c
-
-        local.get $x
-        f32.ceil
-        local.set $d
-
-        local.get $y
-        local.get $a
-        f32x4.replace_lane 0
-        local.set $y
-
-        local.get $y
-        local.get $b
-        f32x4.replace_lane 1
-        local.set $y
-
-        local.get $y
-        local.get $c
-        f32x4.replace_lane 2
-        local.set $y
-
-        local.get $y
-        local.get $d
-        f32x4.replace_lane 3
-        local.set $y
-
-        local.get $y
-        return
-
-      )
-
-      (func $f32_unv (export "f32.unv") (param $x v128) (param $i i32) (result f32)
-        ;; f32x4.extract_lane 0
-        (block
-          (block
-            (block
-              (block
-                (block (local.get $i)
-                       (br_table 0 1 2 3 4)
-                )
-                local.get $x
-                f32x4.extract_lane 0
-                return
-              )
-              local.get $x
-              f32x4.extract_lane 1
-              return
-            )
-            local.get $x
-            f32x4.extract_lane 2
-            return
-          )
-          local.get $x
-          f32x4.extract_lane 3
-          return
-        )
-        f32.const nan
-        return
-      )
-    )
-    "#;
-
-    let store = Store::default();
-    let module = Module::new(&store, &module_wat)?;
-    // The module doesn't import anything, so we create an empty import object.
-    let import_object = imports! {};
-    let instance = Instance::new(&module, &import_object)?;
-
-    let f = instance.exports.get_function("f")?;
-    let f32_unv = instance.exports.get_function("f32.unv")?;
-
-    let result = f.call(&[Value::F32(3.1415926)])?;
-
-    let x0 = match result[0] {
-        Value::V128(x) => f32_unv.call(&[Value::V128(x), Value::I32(0)]),
-        _ => panic!(),
+/**
+Entry points can be defined like this:
+```
+crate::entry_point!("hello", hello);
+fn hello() { ... }
+```
+If you define more than one entry point in one module,
+for technical reasons you need to specify unique identifier names:
+```
+crate::entry_point!("hello1", hello1, _EP_HELLO1);
+fn hello1() { ... }
+crate::entry_point!("hello2", hello2, _EP_HELLO2);
+fn hello2() { ... }
+```
+*/
+#[macro_export]
+macro_rules! entry_point {
+    ($name:expr, $f:expr) => {
+        $crate::entry_point!($name, $f, _ENTRY_POINT);
     };
-
-    let x1 = match result[0] {
-        Value::V128(x) => f32_unv.call(&[Value::V128(x), Value::I32(1)]),
-        _ => panic!(),
+    ($name:expr, $f:expr, $static_name:ident) => {
+        #[linkme::distributed_slice($crate::ENTRY_POINTS)]
+        static $static_name: (&'static str, fn()) = ($name, $f);
     };
+}
 
-    let x2 = match result[0] {
-        Value::V128(x) => f32_unv.call(&[Value::V128(x), Value::I32(2)]),
-        _ => panic!(),
-    };
+fn ensure_entry_points_unique() {
+    for (i, (name, _)) in ENTRY_POINTS.iter().enumerate() {
+        for (name2, _) in &ENTRY_POINTS[..i] {
+            assert_ne!(name, name2, "duplicate entry point names");
+        }
+    }
+}
 
-    let x3 = match result[0] {
-        Value::V128(x) => f32_unv.call(&[Value::V128(x), Value::I32(3)]),
-        _ => panic!(),
-    };
+#[cfg(test)]
+#[test]
+fn entry_points_unique() {
+    ensure_entry_points_unique();
+}
 
-    assert_eq!(x0.unwrap()[0], Value::F32(-3.1415926));
-    // https://github.com/WebAssembly/gc-js-customization/blob/8dfabda9b7925543dcb9afe1fda7d5038374dbdd/test/core/float_misc.wast#L647
-    assert_eq!(x1.unwrap()[0], Value::F32(3.00));
-    assert_eq!(x2.unwrap()[0], Value::F32(3.00));
-    assert_eq!(x3.unwrap()[0], Value::F32(4.00));
+fn main() {
+    ensure_entry_points_unique();
 
-    Ok(())
+    if let Some(entry_point) = std::env::args().nth(1) {
+        let p = ENTRY_POINTS.iter().find(|(name, _)| name == &entry_point);
+        if let Some((_, f)) = p {
+            f();
+            return;
+        } else {
+            eprintln!("no entry point {:?}", entry_point);
+        }
+    } else {
+        eprintln!("entry point not specified");
+        eprintln!("usage:");
+        eprintln!("  cargo run <entry point>");
+    }
+    eprintln!("possible entry points:");
+    for (name, _) in ENTRY_POINTS {
+        eprintln!("- {}", name);
+    }
+    std::process::exit(1);
 }
