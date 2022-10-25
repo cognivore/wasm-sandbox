@@ -1,4 +1,5 @@
 #![feature(let_else)]
+#![feature(allocator_api)]
 
 mod just_wat;
 mod wast_instance;
