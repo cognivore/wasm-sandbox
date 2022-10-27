@@ -4,19 +4,35 @@ use wast;
 crate::entry_point!("wast_instance", go, _EP_GO1);
 
 pub fn mk(x: &str) -> Instance {
+    dbg!("Making an instance:");
     let buf = wast::parser::ParseBuffer::new(x).unwrap();
+    dbg!("Parsing...");
     let mut wat = wast::parser::parse::<wast::Wat>(&buf).unwrap();
+    dbg!("Encoding...");
     let bs = wat.encode().unwrap();
+    dbg!("Making a default store...");
     let store = Store::default();
-    let module = Module::new(&store, &bs).unwrap();
+    dbg!("Making a module with that store...");
+    let module = Module::new(&store, &bs);
+    match &module {
+        Ok(_) => dbg!("Success!"),
+        Err(x) => dbg!(format!("Fail: {}", x)).as_str(),
+    };
+    let module = module.unwrap();
+    dbg!("Importing host functions... ( If I understand ImportObject correctly :) )");
     let import_object = imports! {};
+    dbg!("Instantiating module...");
     Instance::new(&module, &import_object).unwrap()
 }
 
 pub fn run(x: &str, f: &str) -> Box<[wasmer::Val]> {
+    dbg!(format!("Running function {} in a module:", f.clone()));
     let instance = mk(x);
-    let f = instance.exports.get_function(f).unwrap();
-    let y = f.call(&[]);
+    dbg!(format!("Getting function {}...", f.clone()));
+    let phi = instance.exports.get_function(f).unwrap();
+    dbg!(format!("Calling function {}...", f.clone()));
+    let y = phi.call(&[]);
+    dbg!("Returning result...");
     y.unwrap()
 }
 
@@ -141,6 +157,21 @@ fn q14() {
             )
             (func (export "main") (result f32)
                 (call $f (f32.const 0.1) (v128.const f32x4 41.9 0.0 0.0 0.0))
+            )
+        )
+        "#,
+    );
+}
+
+// Wasm
+
+#[test]
+fn q14_1() {
+    main(
+        r#"(module
+            (func $$(param $y f32)(param $p v128)(result f32)local.get $p f32x4.extract_lane 1(local.get $y)f32.add)
+            (func (export "main") (result f32)
+                (call $$ (f32.const 0.1) (v128.const f32x4 41.9 0.0 0.0 0.0))
             )
         )
         "#,

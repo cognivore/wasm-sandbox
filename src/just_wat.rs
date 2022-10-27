@@ -55,9 +55,9 @@ fn main() {
         f32x4.replace_lane 2
         local.set $y
 
-        local.get $y
-        local.get $d
-        f32x4.replace_lane 3
+        ;; local.get $y
+        ;; local.get $d
+        (f32x4.replace_lane 3 (local.get $y) (local.get $d))
         local.set $y
 
         local.get $y
@@ -97,7 +97,12 @@ fn main() {
     "#;
 
     let store = Store::default();
-    let module = Module::new(&store, &module_wat).unwrap();
+    let module = Module::new(&store, &module_wat);
+    match &module {
+        Ok(_) => dbg!("Success!"),
+        Err(x) => dbg!(format!("Fail: {}", x)).as_str(),
+    };
+    let module = module.unwrap();
     // The module doesn't import anything, so we create an empty import object.
     let import_object = imports! {};
     let instance = Instance::new(&module, &import_object).unwrap();
