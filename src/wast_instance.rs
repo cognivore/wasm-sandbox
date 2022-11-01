@@ -177,3 +177,132 @@ fn q14_1() {
         "#,
     );
 }
+
+#[test]
+fn q14_2() {
+    main(
+        r#"(module
+            (func $f (param $y f32) (param $y1 f32) (result f32)
+                local.get $y
+                (f32.add (local.get $y1) (local.get $y1))
+                f32.add
+            )
+            (func (export "main") (result f32)
+                (call $f (f32.const 0.1) (f32.const 20.95))
+            )
+        )
+        "#,
+    );
+}
+
+#[test]
+fn q14_2_1() {
+    let y = main(
+        r#"(module $test
+            (func)
+            (func $f (export "(module (func))") (param $y f32) (param $y1 f32) (result f32)
+                (local $dummy i32)
+                i32.const 42
+                (local.set 2)
+                local.get $y1
+                (f32.add (local.get $y1))
+                local.get $y
+                f32.add
+            )
+            (func (export "main") (result f32)
+                (local $x f32) (local $y f32)
+                (local.set $x (f32.const 0.1))
+                (local.set $y (f32.const 20.95))
+                (call $f (local.get $x) (local.get $y))
+            )
+        )
+        "#,
+    );
+    assert_eq!(y[0], Value::F32(42.0));
+}
+
+#[test]
+fn q14_2_2() {
+    let y = main(
+        r#"(module
+            (func $f (param $y f32) (param $y1 f32) (result f32)
+                local.get $y
+                (f32.add (local.get $y1) (local.get $y1))
+                (f32.add)
+            )
+            (func (export "main") (result f32)
+                (call $f (f32.const 0.1) (f32.const 20.95))
+            )
+        )
+        "#,
+    );
+    assert_eq!(y[0], Value::F32(42.0));
+}
+
+#[test]
+fn q14_2_3() {
+    let y = main(
+        r#"(module
+            (func $f (param $y f32) (param $y1 f32) (result f32)
+                (f32.add (local.get $y1) (local.get $y1))
+                (f32.add (local.get $y))
+            )
+            (func (export "main") (result f32)
+                (call $f (f32.const 0.1) (f32.const 20.95))
+            )
+        )
+        "#,
+    );
+    assert_eq!(y[0], Value::F32(42.0));
+}
+
+#[test]
+fn q14_2_4() {
+    let y = main(
+        r#"(module
+            (func $f (param $y f32) (param $y1 f32) (result f32)
+                (f32.add (local.get $y) (local.get $y) (local.get $y))
+            )
+            (func (export "main") (result f32)
+                (call $f (f32.const 0.1) (f32.const 20.95))
+            )
+        )
+        "#,
+    );
+    assert_eq!(y[0], Value::F32(42.0));
+}
+
+#[test]
+fn q14_2_5() {
+    let y = main(
+        r#"(module
+            (func $f (param $y f32) (param $y1 f32) (result f32)
+                (f32.add (local.get $y) local.get $y)
+            )
+            (func (export "main") (result f32)
+                (call $f (f32.const 0.1) (f32.const 20.95))
+            )
+        )
+        "#,
+    );
+    assert_eq!(y[0], Value::F32(42.0));
+}
+
+#[test]
+fn q14_2_6() {
+    let y = main(
+        r#"(module
+            (func $f (param $y f32) (param $y1 f32) (result f32)
+                (f32.add (f32.const -1.0) local.get $y) ;; 1.0 <~~ goes on top of the stack
+                (f32.add local.get $y local.get $y1 local.get $y1) ;; f32.add local.get $y local.get $y1 = 2.0 + 10.0 ;; local.get $y1 = 10.0 <~~ two values go on top of the stack
+                f32.add ;; 12.0 + 10.0 <~~ goes on top of the stack
+                f32.mul ;; 22.0 * 1.0 <~~ multiplies the two values
+            )
+            (func (export "main") (result f32)
+                (call $f (f32.const 2.0) (f32.const 10.0))
+            )
+        )
+        "#,
+    );
+    assert_eq!(y[0], Value::F32(22.0));
+}
