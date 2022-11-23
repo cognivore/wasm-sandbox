@@ -1,15 +1,22 @@
+use std::{fs::File, io::Write};
+
 use wasmer::{imports, Instance, Module, Store, Value};
 use wast;
 
-crate::entry_point!("wast_instance", go, _EP_GO1);
+crate::entry_point!("dump_bytes", go, _EP_GO1);
+crate::entry_point!("wast_example", go2, _EP_GO2);
 
-pub fn mk(x: &str) -> Instance {
+pub fn atob(x: &str) -> Vec<u8> {
     dbg!("Making an instance:");
     let buf = wast::parser::ParseBuffer::new(x).unwrap();
     dbg!("Parsing...");
     let mut wat = wast::parser::parse::<wast::Wat>(&buf).unwrap();
     dbg!("Encoding...");
-    let bs = wat.encode().unwrap();
+    wat.encode().unwrap()
+}
+
+pub fn mk(x: &str) -> Instance {
+    let bs = atob(x);
     dbg!("Making a default store...");
     let store = Store::default();
     dbg!("Making a module with that store...");
@@ -41,6 +48,55 @@ pub fn main(x: &str) -> Box<[wasmer::Val]> {
 }
 
 fn go() {
+    let wast = [
+        r#"
+    (module
+        (func (param $x_one i32) (param $three i32) (param $y_one i32) (result i32) (i32.add (i32.const 40) (i32.const 2)))
+        (func (param $x_two f32) (param f32) (param f32) (result f32) (local $y_two f32) (f32.add (f32.const 40.0) (f32.const 2.0)))
+    )
+    "#,
+        r#"
+    (module
+        (func (param $x_one i32) (param $three i32) (param $y_one i32) (result i32) (i32.add (i32.const 40) (i32.const 2)))
+        (func (param $x_two f32) (param f32) (param f32) (result i32) (i32.add (i32.const 12) (i32.const 30)))
+    )
+    "#,
+        r#"
+    (module
+        (func (param $x i32) (param i32) (result i32) (i32.add (i32.const 40) (i32.const 2)))
+    )
+    "#,
+        r#"
+    (module
+        (func (param $x i32) (param i32) (result i32) (i32.const 42))
+    )
+    "#,
+        r#"
+    (module
+        (func (param $x i32) (param i32))
+    )
+    "#,
+        r#"
+    (module
+        (func (param $x i32))
+    )
+    "#,
+        r#"
+    (module
+        (func)
+    )
+    "#,
+    ];
+
+    for x in wast {
+        let b = atob(x);
+        let n = b.len();
+        let mut f = File::create(format!("/tmp/simplewast.{n}.bytes")).expect("Can't create file");
+        f.write_all(&b).expect("Can't write file");
+    }
+}
+
+pub fn go2() {
     let wast = r#"(module
         (func $f (export "read") (param i64 f32 f64 i32 i32) (result f64)
             (local f32 i64 i64 f64)
@@ -154,6 +210,23 @@ fn q14() {
                 local.get $y
                 (f32x4.extract_lane 1 (local.get $p))
                 f32.add
+            )
+            (func (export "main") (result f32)
+                (call $f (f32.const 0.1) (v128.const f32x4 41.9 0.0 0.0 0.0))
+            )
+        )
+        "#,
+    );
+}
+
+#[test]
+fn q14_0() {
+    main(
+        r#"(module
+            (func $f (param $y f32) (param $p v128) (result f32)
+                (local.get $y)
+                (f32x4.extract_lane 1 (local.get $p))
+                (f32.add)
             )
             (func (export "main") (result f32)
                 (call $f (f32.const 0.1) (v128.const f32x4 41.9 0.0 0.0 0.0))
