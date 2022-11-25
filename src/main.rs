@@ -3,6 +3,7 @@
 
 mod just_wat;
 mod wast_instance;
+mod wevalf;
 
 extern crate core;
 

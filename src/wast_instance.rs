@@ -49,6 +49,30 @@ pub fn main(x: &str) -> Box<[wasmer::Val]> {
 
 fn go() {
     let wast = [
+        r#"(module
+        (func (export "main_fst") (export "main_snd_")
+            (param $x i32)
+            (param i32)
+            (result i32)
+
+            (i32.add
+                (i32.const 1499550000)
+                (i32.add (i32.const 9000) (i32.const 17))
+            )
+        )
+    )
+    "#,
+        r#"(module
+        (func (export "main")
+            (result i32)
+
+            (i32.add
+                (i32.const 1499550000)
+                (i32.add (i32.const 9000) (i32.const 17))
+            )
+        )
+    )
+    "#,
         r#"
     (module
         (func (param $x_one i32) (param $three i32) (param $y_one i32) (result i32) (i32.add (i32.const 40) (i32.const 2)))
