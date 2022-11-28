@@ -403,3 +403,30 @@ fn q14_2_6() {
     );
     assert_eq!(y[0], Value::F32(22.0));
 }
+
+#[test]
+#[should_panic(
+    expected = r#"called `Result::unwrap()` on an `Err` value: Validate("type mismatch: values remaining on stack at end of block (at offset 57)")"#
+)]
+fn stack_test() {
+    let _y = main(
+        r#"(module
+            (func $f (param $y f32) (result i32)
+                (local $l i32)
+                (local $r i32)
+                (i32.const 0)
+                (local.set $l)
+                (i32.const 1)
+                (local.set $r)
+                (local.get $r)
+                (local.get $l)
+                (i32.add)
+                (local.get $r)
+            )
+            (func (export "main") (result i32)
+                (call $f (f32.const -4.0))
+            )
+        )
+        "#,
+    );
+}
