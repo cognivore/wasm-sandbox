@@ -5,7 +5,7 @@ use wasmer::{imports, Instance, Module, Store};
 
 crate::entry_point!("wevalf", main);
 
-fn main() {
+fn main(_: Vec<String>) {
     let mut b: Vec<u8> = vec![];
     io::stdin().read_to_end(&mut b).unwrap();
     let store = Store::default();

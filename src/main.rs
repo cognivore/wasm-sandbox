@@ -8,12 +8,14 @@ mod wevalf;
 extern crate core;
 
 crate::entry_point!("hello", hello);
-fn hello() {
+fn hello(_: Vec<String>) {
     println!("hello");
 }
 
 #[linkme::distributed_slice]
-static ENTRY_POINTS: [(&'static str, fn())] = [..];
+// static ENTRY_POINTS: [(&'static str, fn())] = [..];
+// Static key-value pairs of entry point names and functions that accept args.
+static ENTRY_POINTS: [(&'static str, fn(Vec<String>))] = [..];
 
 /**
 Entry points can be defined like this:
@@ -37,7 +39,9 @@ macro_rules! entry_point {
     };
     ($name:expr, $f:expr, $static_name:ident) => {
         #[linkme::distributed_slice($crate::ENTRY_POINTS)]
-        static $static_name: (&'static str, fn()) = ($name, $f);
+        // static $static_name: (&'static str, fn()) = ($name, $f);
+        // Static key-value pair of entry point name and function that accepts args.
+        static $static_name: (&'static str, fn(Vec<String>)) = ($name, $f);
     };
 }
 
@@ -61,7 +65,10 @@ fn main() {
     if let Some(entry_point) = std::env::args().nth(1) {
         let p = ENTRY_POINTS.iter().find(|(name, _)| name == &entry_point);
         if let Some((_, f)) = p {
-            f();
+            // Collect arguments into Vec<String>
+            let args_as_vec_string = std::env::args().skip(2).collect();
+            // Forward all the arguments to the entry point.
+            f(args_as_vec_string);
             return;
         } else {
             eprintln!("no entry point {:?}", entry_point);

@@ -4,7 +4,7 @@ use wasmer::{imports, Instance, Module, Store, Value};
 
 crate::entry_point!("just_wat", main);
 
-fn main() {
+fn main(_ : Vec<String>) {
     // let module_wat = r#"
     // (module
     //   (type $t0 (func (param i32) (result i32)))

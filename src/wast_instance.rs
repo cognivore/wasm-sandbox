@@ -5,6 +5,7 @@ use wast;
 
 crate::entry_point!("dump_bytes", go, _EP_GO1);
 crate::entry_point!("wast_example", go2, _EP_GO2);
+crate::entry_point!("wast2bytes", go_prime, _EP_GO_PRIME);
 
 pub fn atob(x: &str) -> Vec<u8> {
     dbg!("Making an instance:");
@@ -47,7 +48,7 @@ pub fn main(x: &str) -> Box<[wasmer::Val]> {
     run(x, "main")
 }
 
-fn go() {
+fn go(_ : Vec<String>) {
     let wast = [
         r#"(module
         (func (export "main_fst") (export "main_snd_")
@@ -120,7 +121,26 @@ fn go() {
     }
 }
 
-pub fn go2() {
+// This function is like `go`, but instead it takes the code to be compiled as a string, and then transforms it to binary with atob, finally, counts the sum of the bytes in the original string, adds "." and the length of the original string, adds ".bytes" and writes the file with such name into the current working directory.
+pub fn go_prime(args : Vec<String>) {
+    // Wast is stored in the 1st argument:
+    let wast = &args[0];
+    // Calculate the length of the original string
+    let wast_len = wast.len();
+    // Calculate the sum of the bytes in the original string
+    let mut wast_sum_bytes = 0;
+    for c in wast.chars() {
+        wast_sum_bytes += c as u32;
+    }
+    // Make the filename
+    let filename = format!("./wast-dump-{}L{}.bytes", wast_sum_bytes, wast_len);
+    // Convert wast to binary representation
+    let b = atob(wast);
+    let mut f = File::create(filename).expect("Can't create file");
+    f.write_all(&b).expect("Can't write file");
+}
+
+pub fn go2(_ : Vec<String>) {
     let wast = r#"(module
         (func $f (export "read") (param i64 f32 f64 i32 i32) (result f64)
             (local f32 i64 i64 f64)
