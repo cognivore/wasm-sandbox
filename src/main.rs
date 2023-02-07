@@ -1,7 +1,7 @@
-#![feature(let_else)]
 #![feature(allocator_api)]
 
 mod just_wat;
+mod run_bin;
 mod wast_instance;
 mod wevalf;
 

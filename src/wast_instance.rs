@@ -3,6 +3,7 @@ use std::{fs::File, io::Write};
 use wasmer::{imports, Instance, Module, Store, Value};
 use wast;
 
+crate::entry_point!("dump_complex", complex, _EP_GO0);
 crate::entry_point!("dump_bytes", go, _EP_GO1);
 crate::entry_point!("wast_example", go2, _EP_GO2);
 crate::entry_point!("wast2bytes", go_prime, _EP_GO_PRIME);
@@ -20,7 +21,6 @@ pub fn mk(x: &str) -> Instance {
     let bs = atob(x);
     dbg!("Making a default store...");
     let store = Store::default();
-    dbg!("Making a module with that store...");
     let module = Module::new(&store, &bs);
     match &module {
         Ok(_) => dbg!("Success!"),
@@ -48,7 +48,72 @@ pub fn main(x: &str) -> Box<[wasmer::Val]> {
     run(x, "main")
 }
 
-fn go(_ : Vec<String>) {
+fn complex(_: Vec<String>) {
+    let wast = [
+        // r#"
+        // (module
+        //     (func (export "main") (result f32)
+        //         (block (result f32) (f32.neg (br 0)))
+        //     )
+        // )"#,
+        r#"
+        (module
+            (func (export "main") (result f32)
+              f32.const 0.42
+              return
+              f32.neg
+            )
+        )
+        "#,
+        r#"
+        (module
+            (func (export "main")
+                (block (br 0))
+            )
+        )"#,
+        r#"
+        (module
+            (func (export "main")
+                (block (drop (f32.neg (br 0))))
+            )
+        )"#,
+        r#"
+        (module
+            (func (export "main")
+                (block
+                    br 0
+                    f32.neg
+                    drop
+                )
+            )
+        )"#,
+        r#"
+        (module
+            (func (export "main") (result f32)
+                (block (result f32)
+                    f32.const 0.42  ;; First, determine the type of this instruction: [] -> [f32]
+                    br 0            ;; Third, determine t^{*} to be [f32], based on the function reduction of block at label,
+                                    ;; Fourth, respect the context C through stack-polymorphism. Determine t^{*}_1 to be [], and t^{*}_2 to be [f32].
+                                    ;; Finally, determine the concrete type of br 0 for validation purposes to be [f32] -> [f32]
+                    f32.neg         ;; Second, determine the type of this instruction: [f32] -> [f32]
+                )
+            )
+        )"#,
+    ];
+
+    let mut i = 0;
+    for x in wast {
+        let b = atob(x);
+        let n = b.len();
+        main(x);
+        let mut f =
+            File::create(format!("/tmp/complexwast{i}.{n}.bytes")).expect("Can't create file");
+        f.write_all(&b).expect("Can't write file");
+        i += 1;
+    }
+}
+
+fn go(_: Vec<String>) {
     let wast = [
         r#"(module
         (func (export "main_fst") (export "main_snd_")
@@ -62,11 +127,22 @@ fn go(_ : Vec<String>) {
             )
         )
     )
+
+    "#,
+        r#"(module
+        (func (export "two_ints")
+            (result i32) (result i32)
+            (i32.add
+                (i32.const 1499550000)
+                (i32.add (i32.const 9000) (i32.const 17))
+            )
+            (i32.add (i32.const -1) (i32.const 1))
+        )
+    )
     "#,
         r#"(module
         (func (export "main")
             (result i32)
-
             (i32.add
                 (i32.const 1499550000)
                 (i32.add (i32.const 9000) (i32.const 17))
@@ -122,7 +198,7 @@ fn go(_ : Vec<String>) {
 }
 
 // This function is like `go`, but instead it takes the code to be compiled as a string, and then transforms it to binary with atob, finally, counts the sum of the bytes in the original string, adds "." and the length of the original string, adds ".bytes" and writes the file with such name into the current working directory.
-pub fn go_prime(args : Vec<String>) {
+pub fn go_prime(args: Vec<String>) {
     // Wast is stored in the 1st argument:
     let wast = &args[0];
     // Calculate the length of the original string
@@ -140,7 +216,7 @@ pub fn go_prime(args : Vec<String>) {
     f.write_all(&b).expect("Can't write file");
 }
 
-pub fn go2(_ : Vec<String>) {
+pub fn go2(_: Vec<String>) {
     let wast = r#"(module
         (func $f (export "read") (param i64 f32 f64 i32 i32) (result f64)
             (local f32 i64 i64 f64)
@@ -374,8 +450,11 @@ fn q14_2_3() {
 }
 
 #[test]
+#[should_panic(
+    expected = r#"called `Result::unwrap()` on an `Err` value: Validate("type mismatch: values remaining on stack at end of block (at offset 48)")"#
+)]
 fn q14_2_4() {
-    let y = main(
+    let _y = main(
         r#"(module
             (func $f (param $y f32) (param $y1 f32) (result f32)
                 (f32.add (local.get $y) (local.get $y) (local.get $y))
@@ -386,7 +465,7 @@ fn q14_2_4() {
         )
         "#,
     );
-    assert_eq!(y[0], Value::F32(42.0));
+    //assert_eq!(y[0], Value::F32(0.1));
 }
 
 #[test]
@@ -402,7 +481,7 @@ fn q14_2_5() {
         )
         "#,
     );
-    assert_eq!(y[0], Value::F32(42.0));
+    assert_eq!(y[0], Value::F32(0.2));
 }
 
 #[test]
@@ -449,4 +528,75 @@ fn stack_test() {
         )
         "#,
     );
+}
+
+#[test]
+fn many_results() {
+    let y = main(
+        r#"(module
+            (func $f (param $y f32) (param $y1 f32) (result f32) (result i32)
+              (local.get $y)
+              (i32.const 42)
+            )
+            (func (export "main") (result f32) (result i32)
+                (call $f (f32.const 2.0) (f32.const 10.0))
+            )
+        )
+        "#,
+    );
+    assert_eq!(y[1], Value::I32(42));
+}
+
+#[test]
+fn sub() {
+    let y = main(
+        r#"(module
+            (func $f (param $y i32) (result i32)
+              (i32.const 42)
+              (i32.add)
+            )
+            (func (export "main") (result i32) (result i32)
+                (call $f (i32.const 0))
+            )
+        )
+        "#,
+    );
+    assert_eq!(y[0], Value::I32(42));
+}
+
+#[test]
+#[should_panic(
+    expected = r#"called `Result::unwrap()` on an `Err` value: Validate("type mismatch: expected i32 but nothing on stack (at offset 41)")"#
+)]
+fn params_arent_on_stack() {
+    let y = main(
+        r#"(module
+            (func $f (param i32) (param i32) (result i32)
+                (i32.add)
+            )
+            (func (export "main") (result i32)
+                (call $f (i32.const 0) (i32.const 42))
+            )
+        )
+        "#,
+    );
+    assert_eq!(y[0], Value::I32(42));
+}
+
+#[test]
+fn params_are_locals() {
+    let y = main(
+        r#"(module
+            (func $f (param i32) (param i32) (result i32)
+              (local.get 0)
+              (local.get 1)
+              (i32.add)
+            )
+            (func (export "main") (result i32)
+                (call $f (i32.const 0) (i32.const 42))
+            )
+        )
+        "#,
+    );
+    assert_eq!(y[0], Value::I32(42));
 }
