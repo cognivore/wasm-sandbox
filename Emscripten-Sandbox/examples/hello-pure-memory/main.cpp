@@ -30,20 +30,21 @@ EMSCRIPTEN_BINDINGS(my_module)
 
 #else /* USE_EMBIND */
 
-// As an alternative to Embind you can use extern "C" 
+// As an alternative to Embind you can use extern "C"
 // https://developer.mozilla.org/en-US/docs/WebAssembly/C_to_wasm
-extern "C" {
-    #include <stdio.h>
+extern "C"
+{
+#include <stdio.h>
 
     char HELLO_WORLD[] = "Hello World.";
-    char* str = &HELLO_WORLD[0];
+    char *str = &HELLO_WORLD[0];
 
-    const char* EMSCRIPTEN_KEEPALIVE getString()
+    const char *EMSCRIPTEN_KEEPALIVE getString()
     {
         return &str[0];
     }
 
-    void EMSCRIPTEN_KEEPALIVE setString(char* s)
+    void EMSCRIPTEN_KEEPALIVE setString(char *s)
     {
         str = s;
     }
