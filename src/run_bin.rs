@@ -7,6 +7,8 @@ pub fn run(x: Instance, fname: &str) -> Box<[wasmer::Val]> {
     f.call(&[]).unwrap()
 }
 
+/*
+
 // Sum type for the different types of values we can get from the interpreter.
 #[derive(Debug)]
 pub enum SimpleVal {
@@ -33,6 +35,8 @@ pub fn unwrap_tagged(y: Box<[wasmer::Val]>, tag: String) -> SimpleVal {
         _ => panic!("Unknown tag: {}", tag),
     }
 }
+
+*/
 
 fn main(args: Vec<String>) {
     // Zeroth argument is the path to the binary

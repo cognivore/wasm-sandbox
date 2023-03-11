@@ -1,9 +1,8 @@
 use std::io::{self, Read};
 
 use wasmer::{imports, Instance, Module, Store};
-// use wast;
 
-crate::entry_point!("wevalf", main);
+crate::entry_point!("wevalf", main, _WE_MAIN);
 
 fn main(_: Vec<String>) {
     let mut b: Vec<u8> = vec![];

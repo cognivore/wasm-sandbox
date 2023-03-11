@@ -7,45 +7,42 @@ crate::entry_point!("dump_complex", complex, _EP_GO0);
 crate::entry_point!("dump_bytes", go, _EP_GO1);
 crate::entry_point!("wast_example", go2, _EP_GO2);
 crate::entry_point!("wast2bytes", go_prime, _EP_GO_PRIME);
+crate::entry_point!("run_main", main_wrapped, _EP_MAIN_WRAPPED);
 
 pub fn atob(x: &str) -> Vec<u8> {
-    dbg!("Making an instance:");
     let buf = wast::parser::ParseBuffer::new(x).unwrap();
-    dbg!("Parsing...");
     let mut wat = wast::parser::parse::<wast::Wat>(&buf).unwrap();
-    dbg!("Encoding...");
     wat.encode().unwrap()
 }
 
 pub fn mk(x: &str) -> Instance {
     let bs = atob(x);
-    dbg!("Making a default store...");
     let store = Store::default();
     let module = Module::new(&store, &bs);
     match &module {
-        Ok(_) => dbg!("Success!"),
+        Ok(_) => "",
         Err(x) => dbg!(format!("Fail: {}", x)).as_str(),
     };
     let module = module.unwrap();
-    dbg!("Importing host functions... ( If I understand ImportObject correctly :) )");
     let import_object = imports! {};
-    dbg!("Instantiating module...");
     Instance::new(&module, &import_object).unwrap()
 }
 
 pub fn run(x: &str, f: &str) -> Box<[wasmer::Val]> {
-    dbg!(format!("Running function {} in a module:", f.clone()));
     let instance = mk(x);
-    dbg!(format!("Getting function {}...", f.clone()));
     let phi = instance.exports.get_function(f).unwrap();
-    dbg!(format!("Calling function {}...", f.clone()));
     let y = phi.call(&[]);
-    dbg!("Returning result...");
     y.unwrap()
 }
 
 pub fn main(x: &str) -> Box<[wasmer::Val]> {
     run(x, "main")
+}
+
+fn main_wrapped(args: Vec<String>) {
+    let res = main(&args[0]);
+    // Now we print into STDOUT the result of the computation.
+    println!("{}", res[0].unwrap_i32());
 }
 
 fn complex(_: Vec<String>) {
