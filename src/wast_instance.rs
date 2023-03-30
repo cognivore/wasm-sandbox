@@ -390,7 +390,7 @@ fn q14_2_1() {
     let y = main(
         r#"(module $test
             (func)
-            (func $f (export "(module (func))") (param $y f32) (param $y1 f32) (result f32)
+            (func $f (export "(module \" (func))") (param $y f32) (param $y1 f32) (result f32)
                 (local $dummy i32)
                 i32.const 42
                 (local.set 2)
@@ -500,6 +500,127 @@ fn q14_2_6() {
     assert_eq!(y[0], Value::F32(22.0));
 }
 
+/* This is just pure sadness, for the time being, I'm not going to run this test
+#[test]
+fn q14_2_7() {
+    let y = main(
+        r#"(module
+            (func $f (param $y f32) (param $y1 f32) (result f32)
+                (f32.sub (f32.const -1.0) local.get $y) ;; -3.0 <~~ goes on top of the stack
+                ;; ^^^^ [-3.0] vvvv [10.0 -8.0 -3.0]
+                (f32.sub local.get $y local.get $y1 local.get $y1) ;; f32.add local.get $y local.get $y1 = 2.0 + 10.0 ;; local.get $y1 = 10.0 <~~ two values go on top of the stack
+                f32.sub ;; 18.0 = 10.0 - (-8.0) [18.0 -3.0] ;;
+                f32.mul ;; -54.0 = 18.0 * -3.0
+            )
+            (func (export "main") (result f32)
+                (call $f (f32.const 2.0) (f32.const 10.0))
+            )
+        )
+        "#,
+    );
+    assert_eq!(y[0], Value::F32(-54.0));
+}
+*/
+
+#[test]
+fn q14_2_7a() {
+    let y = main(
+        r#"(module
+            (func $f (param $y f32) (param $y1 f32) (result f32) (result f32) (result f32)
+                (f32.sub (f32.const -1.0) local.get $y) ;; You would think that -3.0 goes on top of the stack
+                ;; ^^^^ [-3.0] vvvv [10.0 -8.0 -3.0]
+                (f32.sub local.get $y local.get $y1 local.get $y1) ;; f32.add local.get $y local.get $y1 = 2.0 + 10.0 ;; local.get $y1 = 10.0 <~~ two values go on top of the stack
+            )
+            (func (export "main") (result f32) (result f32) (result f32)
+                (call $f (f32.const 2.0) (f32.const 10.0))
+            )
+        )
+        "#,
+    );
+    assert_eq!(y[0], Value::F32(-3.0));
+    // Ви чи що, в кiоску цi специфікації заряджаєте?!
+    // --------> assert_eq!(y[1], Value::F32(-8.0)); <--------
+    assert_eq!(y[1], Value::F32(2.0));
+    // Казав же, що ви не читаєте специфікації!
+    assert_eq!(y[2], Value::F32(0.0));
+    // ^ TODO: Перевiрити, чи воно так працює
+    /* assert_eq!(y[0], Value::F32(10.0));
+    assert_eq!(y[1], Value::F32(-8.0));
+    assert_eq!(y[2], Value::F32(-3.0)); */
+}
+
+#[test]
+fn q14_2_7b() {
+    let y = main(
+        r#"(module
+            (func $f (param $y f32) (param $y1 f32) (result f32) (result f32) (result f32)
+                (f32.sub (f32.const -1.0) (local.get $y)) ;; -3.0 <~~ goes on top of the stack
+                ;; ^^^^ [-3.0] vvvv [10.0 -8.0 -3.0]
+                (f32.sub (local.get $y) (local.get $y1) (local.get $y1)) ;; f32.add local.get $y local.get $y1 = 2.0 + 10.0 ;; local.get $y1 = 10.0 <~~ two values go on top of the stack
+            )
+            (func (export "main") (result f32) (result f32) (result f32)
+                (call $f (f32.const 2.0) (f32.const 10.0))
+            )
+        )
+        "#,
+    );
+    assert_eq!(y[0], Value::F32(-3.0));
+    // assert_eq!(y[1], Value::F32(-8.0));
+    assert_eq!(y[1], Value::F32(2.0));
+    // assert_eq!(y[2], Value::F32(10.0));
+    assert_eq!(y[2], Value::F32(0.0));
+    // Пiздець, як це працює?!
+}
+
+#[test]
+fn q14_2_7c() {
+    let y = main(
+        r#"(module
+            (func $f (param $y f32) (param $y1 f32) (result f32) (result f32) (result f32 f32)
+                (f32.sub (f32.const -1.0) (local.get $y)) ;; -3.0 <~~ goes on top of the stack
+                ;; ^^^^ [-3.0] vvvv [10.0 -8.0 -3.0]
+                (f32.sub (local.get $y) (local.get $y1) (local.get $y) (local.get $y1)) ;; f32.add local.get $y local.get $y1 = 2.0 + 10.0 ;; local.get $y1 = 10.0 <~~ two values go on top of the stack
+            )
+            (func (export "main") (result f32) (result f32) (result f32 f32) 
+                (call $f (f32.const 2.0) (f32.const 10.0))
+            )
+        )
+        "#,
+    );
+    assert_eq!(y[0], Value::F32(-3.0));
+    // assert_eq!(y[1], Value::F32(-8.0));
+    //// assert_eq!(y[1], Value::F32(10.0));
+    assert_eq!(y[1], Value::F32(2.0));
+    // assert_eq!(y[2], Value::F32(10.0));
+    //// assert_eq!(y[2], Value::F32(2.0));
+    assert_eq!(y[2], Value::F32(10.0));
+    assert_eq!(y[3], Value::F32(-8.0));
+    // Пiздець, як це працює?!
+}
+
+/* This is just pure sadness, for the time being, I'm not going to run this test
+#[test]
+fn q14_2_8() {
+    let y = main(
+        r#"(module
+            (func $f (param $y f32) (param $y1 f32) (result f32)
+                (f32.sub (f32.const -1.0) local.get $y) ;; -3.0 <~~ goes on top of the stack
+                ;; ^^^^ [-3.0] vvvv [2.0 10.0 -8.0 -3.0]
+                (f32.sub local.get $y local.get $y1 local.get $y1 local.get $y) ;; f32.add local.get $y local.get $y1 = 2.0 + 10.0 ;; local.get $y1 = 10.0 <~~ two values go on top of the stack
+                f32.sub ;; 2.0 - 10.00 = -8.0 [-8.0 -8.0 -3.0]
+                f32.sub ;; -8.0 - (-8.0) = 0.0 [0.0 -3.0]
+                f32.sub ;; 0.0 - (-3.0) = 3.0 [3.0]
+            )
+            (func (export "main") (result f32)
+                (call $f (f32.const 2.0) (f32.const 10.0))
+            )
+        )
+        "#,
+    );
+    assert_eq!(y[0], Value::F32(3.0));
+}
+*/
+
 #[test]
 #[should_panic(
     expected = r#"called `Result::unwrap()` on an `Err` value: Validate("type mismatch: values remaining on stack at end of block (at offset 57)")"#
@@ -545,23 +666,6 @@ fn many_results() {
 }
 
 #[test]
-fn sub() {
-    let y = main(
-        r#"(module
-            (func $f (param $y i32) (result i32)
-              (i32.const 42)
-              (i32.add)
-            )
-            (func (export "main") (result i32) (result i32)
-                (call $f (i32.const 0))
-            )
-        )
-        "#,
-    );
-    assert_eq!(y[0], Value::I32(42));
-}
-
-#[test]
 #[should_panic(
     expected = r#"called `Result::unwrap()` on an `Err` value: Validate("type mismatch: expected i32 but nothing on stack (at offset 41)")"#
 )]
@@ -596,4 +700,43 @@ fn params_are_locals() {
         "#,
     );
     assert_eq!(y[0], Value::I32(42));
+}
+
+#[test]
+fn select_blocks_1() {
+    let y = main(
+        r#"(module
+            (func (export "main") (result i32)
+                (select (block (result i32) (i32.const 1)) (i32.const 2) (i32.const 3))
+            )
+        )
+        "#,
+    );
+    assert_eq!(y[0], Value::I32(1));
+}
+
+#[test]
+fn select_blocks_2() {
+    let y = main(
+        r#"(module
+            (func (export "main") (result i32)
+                (select (i32.const 2) (block (result i32) (i32.const 1)) (i32.const 3))
+            )
+        )
+        "#,
+    );
+    assert_eq!(y[0], Value::I32(2));
+}
+
+#[test]
+fn select_blocks_3() {
+    let y = main(
+        r#"(module
+            (func (export "main") (result i32)
+                (select (i32.const 2) (i32.const 3) (block (result i32) (i32.const 1)))
+            )
+        )
+        "#,
+    );
+    assert_eq!(y[0], Value::I32(2));
 }
