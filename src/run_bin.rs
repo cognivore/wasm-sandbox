@@ -1,10 +1,10 @@
 crate::entry_point!("run_bin", main);
 
-use wasmer::{imports, Instance, Module, Store};
+use wasmer::{imports, AsStoreMut, Engine, Instance, Module, Store};
 
-pub fn run(x: Instance, fname: &str) -> Box<[wasmer::Val]> {
+pub fn run(store: &mut impl AsStoreMut, x: Instance, fname: &str) -> Box<[wasmer::Value]> {
     let f = x.exports.get_function(fname).unwrap();
-    f.call(&[]).unwrap()
+    f.call(store, &[]).unwrap()
 }
 
 /*
@@ -58,10 +58,11 @@ fn main(args: Vec<String>) {
     let import_object = imports! {};
 
     // Instantiate the module with the import object.
-    let instance = Instance::new(&module, &import_object).unwrap();
+    let mut store = Store::new(Engine::default());
+    let instance = Instance::new(&mut store, &module, &import_object).unwrap();
 
     // Run the function and debug its result.
-    let y = run(instance, &func_name);
+    let y = run(&mut store, instance, &func_name);
     // Debug the result now.
     println!("{:?}", y);
 }
