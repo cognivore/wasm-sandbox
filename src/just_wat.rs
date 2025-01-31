@@ -4,7 +4,7 @@ use wasmer::{imports, Instance, Module, Store, Value};
 
 crate::entry_point!("just_wat", main);
 
-fn main(_ : Vec<String>) {
+fn main(_: Vec<String>) {
     // let module_wat = r#"
     // (module
     //   (type $t0 (func (param i32) (result i32)))
@@ -104,31 +104,32 @@ fn main(_ : Vec<String>) {
     };
     let module = module.unwrap();
     // The module doesn't import anything, so we create an empty import object.
+    let mut store = Store::default();
     let import_object = imports! {};
-    let instance = Instance::new(&module, &import_object).unwrap();
+    let instance = Instance::new(&mut store, &module, &import_object).unwrap();
 
     let f = instance.exports.get_function("f").unwrap();
     let f32_unv = instance.exports.get_function("f32.unv").unwrap();
 
-    let result = f.call(&[Value::F32(3.1415926)]).unwrap();
+    let result = f.call(&mut store, &[Value::F32(3.1415926)]).unwrap();
 
     let x0 = match result[0] {
-        Value::V128(x) => f32_unv.call(&[Value::V128(x), Value::I32(0)]),
+        Value::V128(x) => f32_unv.call(&mut store, &[Value::V128(x), Value::I32(0)]),
         _ => panic!(),
     };
 
     let x1 = match result[0] {
-        Value::V128(x) => f32_unv.call(&[Value::V128(x), Value::I32(1)]),
+        Value::V128(x) => f32_unv.call(&mut store, &[Value::V128(x), Value::I32(1)]),
         _ => panic!(),
     };
 
     let x2 = match result[0] {
-        Value::V128(x) => f32_unv.call(&[Value::V128(x), Value::I32(2)]),
+        Value::V128(x) => f32_unv.call(&mut store, &[Value::V128(x), Value::I32(2)]),
         _ => panic!(),
     };
 
     let x3 = match result[0] {
-        Value::V128(x) => f32_unv.call(&[Value::V128(x), Value::I32(3)]),
+        Value::V128(x) => f32_unv.call(&mut store, &[Value::V128(x), Value::I32(3)]),
         _ => panic!(),
     };
 

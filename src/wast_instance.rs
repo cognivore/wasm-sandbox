@@ -1,6 +1,6 @@
 use std::{fs::File, io::Write};
 
-use wasmer::{imports, Instance, Module, Store, Value};
+use wasmer::{imports, AsStoreMut, Instance, Module, Store, Value};
 use wast;
 
 crate::entry_point!("dump_complex", complex, _EP_GO0);
@@ -15,28 +15,28 @@ pub fn atob(x: &str) -> Vec<u8> {
     wat.encode().unwrap()
 }
 
-pub fn mk(x: &str) -> Instance {
+pub fn mk(store: &mut impl AsStoreMut, x: &str) -> Instance {
     let bs = atob(x);
-    let store = Store::default();
-    let module = Module::new(&store, &bs);
+    let module = Module::new(&store.as_store_ref(), &bs);
     match &module {
         Ok(_) => "",
         Err(x) => dbg!(format!("Fail: {}", x)).as_str(),
     };
     let module = module.unwrap();
     let import_object = imports! {};
-    Instance::new(&module, &import_object).unwrap()
+    Instance::new(store, &module, &import_object).unwrap()
 }
 
-pub fn run(x: &str, f: &str) -> Box<[wasmer::Val]> {
-    let instance = mk(x);
+pub fn run(store: &mut impl AsStoreMut, x: &str, f: &str) -> Box<[wasmer::Value]> {
+    let instance = mk(store, x);
     let phi = instance.exports.get_function(f).unwrap();
-    let y = phi.call(&[]);
+    let y = phi.call(store, &[]);
     y.unwrap()
 }
 
-pub fn main(x: &str) -> Box<[wasmer::Val]> {
-    run(x, "main")
+pub fn main(x: &str) -> Box<[wasmer::Value]> {
+    let mut store = Store::default();
+    run(&mut store, x, "main")
 }
 
 fn main_wrapped(args: Vec<String>) {
@@ -252,16 +252,20 @@ pub fn go2(_: Vec<String>) {
     )
     "#;
 
-    let instance = mk(wast);
+    let mut store = Store::default();
+    let instance = mk(&mut store, wast);
 
     let f = instance.exports.get_function("read").unwrap();
-    let result = f.call(&[
-        Value::I64(1),
-        Value::F32(2.0),
-        Value::F64(3.3),
-        Value::I32(4),
-        Value::I32(5),
-    ]);
+    let result = f.call(
+        &mut store,
+        &[
+            Value::I64(1),
+            Value::F32(2.0),
+            Value::F64(3.3),
+            Value::I32(4),
+            Value::I32(5),
+        ],
+    );
     let result1 = result.clone();
 
     assert_eq!(result.unwrap()[0], Value::F64(34.8));
@@ -272,7 +276,7 @@ pub fn go2(_: Vec<String>) {
 
 #[test]
 #[should_panic(
-    expected = r#"called `Result::unwrap()` on an `Err` value: Validate("type mismatch: expected v128, found f32 (at offset 28)")"#
+    expected = r#"called `Result::unwrap()` on an `Err` value: Validate("type mismatch: expected v128, found f32 (at offset 0x1c)")"#
 )]
 fn q11() {
     main(
@@ -289,7 +293,7 @@ fn q11() {
 
 #[test]
 #[should_panic(
-    expected = r#"called `Result::unwrap()` on an `Err` value: Validate("type mismatch: expected v128, found f32 (at offset 28)")"#
+    expected = r#"called `Result::unwrap()` on an `Err` value: Validate("type mismatch: expected v128, found f32 (at offset 0x1c)")"#
 )]
 fn q12() {
     main(
@@ -305,7 +309,7 @@ fn q12() {
 
 #[test]
 #[should_panic(
-    expected = r#"called `Result::unwrap()` on an `Err` value: Validate("type mismatch: values remaining on stack at end of block (at offset 33)")"#
+    expected = r#"called `Result::unwrap()` on an `Err` value: Validate("type mismatch: values remaining on stack at end of block (at offset 0x21)")"#
 )]
 fn q13() {
     main(
@@ -448,7 +452,7 @@ fn q14_2_3() {
 
 #[test]
 #[should_panic(
-    expected = r#"called `Result::unwrap()` on an `Err` value: Validate("type mismatch: values remaining on stack at end of block (at offset 48)")"#
+    expected = r#"called `Result::unwrap()` on an `Err` value: Validate("type mismatch: values remaining on stack at end of block (at offset 0x30)")"#
 )]
 fn q14_2_4() {
     let _y = main(
@@ -623,7 +627,7 @@ fn q14_2_8() {
 
 #[test]
 #[should_panic(
-    expected = r#"called `Result::unwrap()` on an `Err` value: Validate("type mismatch: values remaining on stack at end of block (at offset 57)")"#
+    expected = r#"called `Result::unwrap()` on an `Err` value: Validate("type mismatch: values remaining on stack at end of block (at offset 0x39)")"#
 )]
 fn stack_test() {
     let _y = main(
@@ -667,7 +671,7 @@ fn many_results() {
 
 #[test]
 #[should_panic(
-    expected = r#"called `Result::unwrap()` on an `Err` value: Validate("type mismatch: expected i32 but nothing on stack (at offset 41)")"#
+    expected = r#"called `Result::unwrap()` on an `Err` value: Validate("type mismatch: expected i32 but nothing on stack (at offset 0x29)")"#
 )]
 fn params_arent_on_stack() {
     let y = main(
